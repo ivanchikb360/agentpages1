@@ -77,28 +77,6 @@ const FeatureCard = ({ icon: Icon, title, description }) => {
   );
 };
 
-interface ParallaxSectionProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-const ParallaxSection = ({
-  children,
-  className = '',
-}: ParallaxSectionProps) => {
-  const { scrollYProgress } = useScroll({
-    offset: ['start end', 'end start'],
-  });
-
-  const y = useTransform(scrollYProgress, [0, 1], [100, -100]);
-
-  return (
-    <motion.div style={{ y }} className={className}>
-      {children}
-    </motion.div>
-  );
-};
-
 export default function LandingPage() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -273,7 +251,7 @@ export default function LandingPage() {
         id="features"
         className="container mx-auto px-4 py-20 overflow-hidden"
       >
-        <ParallaxSection children={undefined}>
+        <div>
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -288,7 +266,7 @@ export default function LandingPage() {
               landing pages
             </p>
           </motion.div>
-        </ParallaxSection>
+        </div>
 
         <motion.div
           variants={staggerContainer}
@@ -339,7 +317,7 @@ export default function LandingPage() {
         id="how-it-works"
         className="container mx-auto px-4 py-20 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden"
       >
-        <ParallaxSection children={undefined}>
+        <div>
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -353,20 +331,16 @@ export default function LandingPage() {
               Create stunning property landing pages in just a few simple steps
             </p>
           </motion.div>
-        </ParallaxSection>
+        </div>
 
         {/* Vertical connecting line for mobile */}
-        <motion.div
+        <div
           className="md:hidden absolute left-1/2 w-0.5 bg-blue-200"
           style={{
             top: '360px', // Adjust this value to match your first card's position
             height: 'calc(100% - 480px)', // Adjust to match the distance between first and last card
             transformOrigin: 'top',
           }}
-          initial={{ scaleY: 0 }}
-          whileInView={{ scaleY: 1 }}
-          viewport={{ once: false }}
-          transition={{ duration: 1.5, ease: 'easeOut' }}
         />
 
         <motion.div
@@ -489,7 +463,7 @@ export default function LandingPage() {
         id="benefits"
         className="container mx-auto px-4 py-20 overflow-hidden"
       >
-        <ParallaxSection children={undefined}>
+        <div>
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -500,7 +474,7 @@ export default function LandingPage() {
               Real Results for Real Estate Agents
             </h2>
           </motion.div>
-        </ParallaxSection>
+        </div>
 
         {/* Stats Row */}
         <motion.div
