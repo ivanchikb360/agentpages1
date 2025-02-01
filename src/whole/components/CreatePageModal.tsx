@@ -64,15 +64,29 @@ export function CreatePageModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Add validation
+    if (!propertyData.title.trim()) {
+      toast.error('Property title is required');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await onCreatePage({
+      console.log('Submitting form with data:', {
         ...propertyData,
         images: uploadedImages,
       });
+
+      await onCreatePage({
+        ...propertyData,
+        title: propertyData.title.trim(), // Ensure title is trimmed
+        images: uploadedImages,
+      });
+
       resetForm();
     } catch (error) {
-      console.error('Error creating page:', error);
+      console.error('Error in CreatePageModal:', error);
       toast.error('Failed to create page');
     } finally {
       setIsLoading(false);
@@ -301,7 +315,7 @@ export function CreatePageModal({
                 <Button
                   type="button"
                   onClick={() => setStep(step + 1)}
-                  disabled={!propertyData.title && step === 1}
+                  disabled={!propertyData.title.trim() && step === 1}
                 >
                   Next
                 </Button>

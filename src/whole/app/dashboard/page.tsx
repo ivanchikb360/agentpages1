@@ -40,7 +40,7 @@ import {
   AlertDialogTrigger,
 } from '../../../components/ui/alert-dialog';
 import { v4 as uuidv4 } from 'uuid';
-import { generatePropertyContent } from '../../../services/ai-property';
+import { generatePropertyContent } from '../../services/ai-property';
 
 interface LandingPage {
   id: string;
@@ -284,11 +284,14 @@ export default function AllPages() {
         onClose={() => setIsModalOpen(false)}
         onCreatePage={async (propertyData) => {
           try {
+            console.log('Creating page with data:', propertyData); // Debug log
+
             // First create the landing page record
             const { data: page, error } = await supabase
               .from('landing_pages')
               .insert({
                 user_id: user?.id,
+                title: propertyData.title,
                 status: 'draft',
                 property_data: {
                   title: propertyData.title,
@@ -298,31 +301,43 @@ export default function AllPages() {
                   squareFootage: propertyData.squareFootage,
                   address: propertyData.address,
                   description: propertyData.description,
-                  features: propertyData.features,
-                  images: propertyData.images,
-                  agent: propertyData.agent,
+                  features: propertyData.features || [],
+                  images: propertyData.images || [],
+                  agent: propertyData.agent || {
+                    name: '',
+                    phone: '',
+                    email: '',
+                  },
                 },
-                content: [], // Will be populated after AI generation
+                content: [],
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               })
               .select()
               .single();
 
-            if (error) throw error;
+            if (error) {
+              console.error('Error creating landing page:', error); // Debug log
+              throw error;
+            }
+
+            console.log('Page created:', page); // Debug log
 
             // Generate AI content based on property data
+            console.log('Generating AI content...'); // Debug log
             const aiContent = await generatePropertyContent({
               title: propertyData.title,
-              price: propertyData.price,
-              bedrooms: propertyData.bedrooms,
-              bathrooms: propertyData.bathrooms,
-              squareFootage: propertyData.squareFootage,
-              address: propertyData.address,
-              description: propertyData.description,
-              features: propertyData.features,
-              images: propertyData.images,
+              price: propertyData.price || '',
+              bedrooms: propertyData.bedrooms || '',
+              bathrooms: propertyData.bathrooms || '',
+              squareFootage: propertyData.squareFootage || '',
+              address: propertyData.address || '',
+              description: propertyData.description || '',
+              features: propertyData.features || [],
+              images: propertyData.images || [],
             });
+
+            console.log('AI content generated:', aiContent); // Debug log
 
             // Update the page with AI-generated content
             const { error: updateError } = await supabase
@@ -332,34 +347,47 @@ export default function AllPages() {
                   {
                     id: uuidv4(),
                     type: 'hero',
-                    content: aiContent.hero,
+                    content: aiContent.hero || {
+                      title: propertyData.title,
+                      subtitle: '',
+                      image: propertyData.images[0] || '',
+                      price: propertyData.price || '',
+                    },
                     required: true,
                   },
                   {
                     id: uuidv4(),
                     type: 'features',
-                    content: aiContent.features,
+                    content: aiContent.features || {
+                      features: [],
+                    },
                     required: true,
                   },
                   {
                     id: uuidv4(),
                     type: 'gallery',
                     content: {
-                      images: propertyData.images,
+                      images: propertyData.images || [],
                     },
                     required: true,
                   },
                   {
                     id: uuidv4(),
                     type: 'description',
-                    content: aiContent.description,
+                    content: aiContent.description || {
+                      text: propertyData.description || '',
+                    },
                     required: true,
                   },
                   {
                     id: uuidv4(),
                     type: 'contact',
                     content: {
-                      agent: propertyData.agent,
+                      agent: propertyData.agent || {
+                        name: '',
+                        phone: '',
+                        email: '',
+                      },
                     },
                     required: true,
                   },
@@ -367,15 +395,21 @@ export default function AllPages() {
               })
               .eq('id', page.id);
 
-            if (updateError) throw updateError;
+            if (updateError) {
+              console.error(
+                'Error updating page with AI content:',
+                updateError
+              ); // Debug log
+              throw updateError;
+            }
 
             // Navigate to the page builder
             navigate(`/dashboard/page-builder/${page.id}`);
             setIsModalOpen(false);
             toast.success('Landing page created successfully!');
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error creating page:', error);
-            toast.error('Failed to create page');
+            toast.error(error.message || 'Failed to create page');
           }
         }}
       />
