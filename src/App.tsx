@@ -23,6 +23,8 @@ import BlogPostPage from './whole/public/BlogPostPage';
 import DashboardLayout from './whole/app/dashboard/layout';
 import CreateProperty from './whole/app/create-property/page';
 import PreviewPage from './whole/app/preview/[id]/page';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // import WebsiteBuilder from './Components/Routes/Websitebuilder';
 // import SignUp from './Components/public/SignUp';
@@ -85,6 +87,8 @@ function App() {
             <Route path="/blog/:id" element={<BlogPostPage />} />
             <Route path="/create-property" element={<CreateProperty />} />
           </Routes>
+          <Analytics />
+          <SpeedInsights />
         </BrowserRouter>
       </DndProvider>
     </AuthProvider>
