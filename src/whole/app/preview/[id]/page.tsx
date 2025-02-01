@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../../lib/supabase';
 import { Hero } from '../../../components/page-builder/sections/Hero';
 import { Features } from '../../../components/page-builder/sections/Features';
@@ -26,8 +26,26 @@ const sectionComponents = {
 
 export default function PreviewPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
   const [pageData, setPageData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const validatePreviewAccess = async () => {
+    if (!token) return false;
+
+    const { data, error } = await supabase
+      .from('preview_tokens')
+      .select('*')
+      .eq('id', token)
+      .eq('page_id', id)
+      .single();
+
+    if (error || !data) return false;
+
+    // Check if token is expired
+    return new Date(data.expires_at) > new Date();
+  };
 
   useEffect(() => {
     const getImageUrl = (imagePath: string | null) => {

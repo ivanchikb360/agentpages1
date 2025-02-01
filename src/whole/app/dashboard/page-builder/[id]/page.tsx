@@ -1,6 +1,5 @@
 'use client';
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -18,6 +17,8 @@ import {
   Undo,
   Redo,
   Wand2,
+  X,
+  Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useHistory } from '../../../../hooks/useHistory';
@@ -31,6 +32,9 @@ import {
 } from '../../../../../services/ai-property';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
+import { formatDistanceToNow } from 'date-fns';
+import { debounce } from 'lodash';
+import { PreviewRenderer } from '../../../../components/page-builder/PreviewRenderer';
 
 interface LandingPageImage {
   id: string; // Unique ID for the image
@@ -110,6 +114,13 @@ const generateAIContent = async (pageData: any) => {
   }
 };
 
+// Add these constants at the top
+const PREVIEW_SIZES = {
+  mobile: 'max-w-[375px]',
+  tablet: 'max-w-[768px]',
+  desktop: 'max-w-none',
+} as const;
+
 export default function PageBuilder() {
   const { id } = useParams();
   const [pageData, setPageData] = useState(null);
@@ -125,6 +136,51 @@ export default function PageBuilder() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<
+    'mobile' | 'tablet' | 'desktop'
+  >('desktop');
+
+  // Add preview transition
+  const previewTransition = {
+    enter: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 20 },
+  };
+
+  // Create debounced save function
+  const debouncedSave = useCallback(
+    debounce(async (content: any[]) => {
+      try {
+        setIsSaving(true);
+        const { error } = await supabase
+          .from('landing_pages')
+          .update({
+            content,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+        setLastSaved(new Date());
+        console.log('Autosaved successfully');
+      } catch (error) {
+        console.error('Autosave failed:', error);
+        toast.error('Failed to autosave');
+      } finally {
+        setIsSaving(false);
+      }
+    }, 2000), // 2 second delay
+    [id]
+  );
+
+  // Trigger autosave when content changes
+  useEffect(() => {
+    if (canvasContent.length > 0) {
+      debouncedSave(canvasContent);
+    }
+  }, [canvasContent, debouncedSave]);
 
   useEffect(() => {
     const loadPageData = async () => {
@@ -411,6 +467,33 @@ export default function PageBuilder() {
     }
   };
 
+  // Add this function
+  const handleSharePreview = async () => {
+    try {
+      // Generate a preview token
+      const { data: token, error: tokenError } = await supabase
+        .from('preview_tokens')
+        .insert({
+          page_id: id,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        })
+        .select()
+        .single();
+
+      if (tokenError) throw tokenError;
+
+      // Create preview URL
+      const previewUrl = `${window.location.origin}/preview/${id}?token=${token.id}`;
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(previewUrl);
+      toast.success('Preview link copied to clipboard!');
+    } catch (error) {
+      console.error('Error sharing preview:', error);
+      toast.error('Failed to create preview link');
+    }
+  };
+
   if (isInitializing) {
     return (
       <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-50 relative overflow-hidden">
@@ -498,87 +581,118 @@ export default function PageBuilder() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex flex-col h-screen overflow-hidden">
-        <header className="flex justify-between items-center p-4 border-b h-16">
-          <Link
-            to="/dashboard"
-            className="flex items-center text-blue-600 hover:text-blue-800"
-          >
-            <ArrowLeft className="mr-2" />
-            Back to Dashboard
-          </Link>
-          <div className="flex items-center space-x-4">
-            <Tabs
-              value={previewMode}
-              onValueChange={(value: any) => setPreviewMode(value)}
-            >
-              <TabsList>
-                <TabsTrigger value="mobile">
-                  <Smartphone className="h-5 w-5" />
-                </TabsTrigger>
-                <TabsTrigger value="tablet">
-                  <Tablet className="h-5 w-5" />
-                </TabsTrigger>
-                <TabsTrigger value="desktop">
-                  <Monitor className="h-5 w-5" />
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Button variant="outline" onClick={() => setPreviewMode('desktop')}>
-              <Eye className="mr-2 h-4 w-4" /> Preview
-            </Button>
-            <Button onClick={undo} disabled={!canUndo}>
-              <Undo className="mr-2 h-4 w-4" /> Undo
-            </Button>
-            <Button onClick={redo} disabled={!canRedo}>
-              <Redo className="mr-2 h-4 w-4" /> Redo
-            </Button>
-            <Button onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" /> Save
-            </Button>
-            <Button onClick={handlePublish}>Publish</Button>
-            <Button onClick={handleGenerateAI} disabled={isLoading}>
-              <Wand2 className="mr-2 h-4 w-4" />
-              AI Generate
-            </Button>
+      <div className="flex flex-col h-screen">
+        <header className="border-b">
+          <div className="container mx-auto p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              </Link>
+              {/* Autosave indicator */}
+            </div>
+            <div className="flex items-center gap-2">
+              {isPreviewMode ? (
+                <>
+                  <Tabs
+                    value={previewDevice}
+                    onValueChange={(v: any) => setPreviewDevice(v)}
+                  >
+                    <TabsList>
+                      <TabsTrigger value="mobile">
+                        <Smartphone className="h-4 w-4" />
+                      </TabsTrigger>
+                      <TabsTrigger value="tablet">
+                        <Tablet className="h-4 w-4" />
+                      </TabsTrigger>
+                      <TabsTrigger value="desktop">
+                        <Monitor className="h-4 w-4" />
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsPreviewMode(false)}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Exit Preview
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsPreviewMode(true)}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
+              )}
+              <Button onClick={undo} disabled={!canUndo}>
+                <Undo className="mr-2 h-4 w-4" /> Undo
+              </Button>
+              <Button onClick={redo} disabled={!canRedo}>
+                <Redo className="mr-2 h-4 w-4" /> Redo
+              </Button>
+              <Button onClick={handleSave}>
+                <Save className="mr-2 h-4 w-4" /> Save
+              </Button>
+              <Button onClick={handlePublish}>Publish</Button>
+              <Button onClick={handleGenerateAI} disabled={isLoading}>
+                <Wand2 className="mr-2 h-4 w-4" />
+                AI Generate
+              </Button>
+              {isPreviewMode && (
+                <Button variant="outline" onClick={handleSharePreview}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share Preview
+                </Button>
+              )}
+            </div>
           </div>
         </header>
-        <div className="flex flex-1 overflow-hidden">
-          <ToolMenu className="h-[calc(100vh-4rem)]" />
-          <Canvas
-            content={canvasContent}
-            setContent={setCanvasContent}
-            selectedElementId={selectedElementId}
-            setSelectedElementId={setSelectedElementId}
-            selectedElement={selectedElement}
-            setSelectedElement={setSelectedElement}
-            previewMode={previewMode}
-            className="flex-1 h-[calc(100vh-4rem)]"
-            propertyData={{
-              title: '',
-              price: '',
-              bedrooms: '',
-              bathrooms: '',
-              squareFootage: '',
-              address: '',
-              description: '',
-              features: [],
-              images: [],
-              agent: {
-                name: '',
-                phone: '',
-                email: '',
-                photo: '',
-              },
-            }}
-          />
-          <EditingMenu
-            selectedElementId={selectedElementId}
-            setSelectedElementId={setSelectedElementId}
-            canvasContent={canvasContent}
-            setCanvasContent={setCanvasContent}
-            onEnhanceSection={handleEnhanceSection}
-          />
+
+        <div className="flex-1 overflow-hidden">
+          {isPreviewMode ? (
+            <motion.div
+              className="h-full bg-gray-100 overflow-y-auto"
+              initial="exit"
+              animate="enter"
+              variants={previewTransition}
+            >
+              <div
+                className={`mx-auto bg-white shadow-xl transition-all duration-300 ${PREVIEW_SIZES[previewDevice]}`}
+              >
+                <PreviewRenderer
+                  content={canvasContent}
+                  propertyData={pageData?.property_data}
+                />
+              </div>
+            </motion.div>
+          ) : (
+            <div className="flex h-full">
+              <ToolMenu className="h-full" />
+              <Canvas
+                previewMode={previewMode}
+                content={canvasContent}
+                setContent={setCanvasContent}
+                selectedElementId={selectedElementId}
+                setSelectedElementId={setSelectedElementId}
+                selectedElement={selectedElement}
+                setSelectedElement={setSelectedElement}
+                className="flex-1"
+                propertyData={pageData?.property_data}
+              />
+              <EditingMenu
+                selectedElementId={selectedElementId}
+                setSelectedElementId={setSelectedElementId}
+                canvasContent={canvasContent}
+                setCanvasContent={setCanvasContent}
+                onEnhanceSection={handleEnhanceSection}
+              />
+            </div>
+          )}
         </div>
       </div>
     </DndProvider>
