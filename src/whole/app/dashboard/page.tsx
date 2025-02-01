@@ -40,7 +40,7 @@ import {
   AlertDialogTrigger,
 } from '../../../components/ui/alert-dialog';
 import { v4 as uuidv4 } from 'uuid';
-import { generatePropertyContent } from '../../../services/ai-property';
+import { generatePropertyContent } from '../../services/ai-property';
 
 interface LandingPage {
   id: string;

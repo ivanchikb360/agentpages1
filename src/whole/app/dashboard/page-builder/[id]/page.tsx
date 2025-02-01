@@ -26,10 +26,7 @@ import { supabase } from '../../../../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { aiBuilder } from '../../../../../services/ai-builder';
 import { ToolMenu } from '../../../../components/page-builder/ToolMenu';
-import {
-  generatePropertyContent,
-  generateSimilarProperties,
-} from '../../../../../services/ai-property';
+import { generatePropertyContent } from '../../../../services/ai-property';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
@@ -445,11 +442,23 @@ export default function PageBuilder() {
       let enhancedContent;
       switch (section.type) {
         case 'similar':
-          enhancedContent = await generateSimilarProperties(
-            pageData.property_data
-          );
+          enhancedContent = await fetch('/api/generate-similar-properties', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              propertyData: pageData.property_data,
+            }),
+          }).then((res) => res.json());
           break;
-        // Add other section-specific enhancements
+        case 'description':
+        case 'amenities':
+        case 'contact':
+          enhancedContent = section.content;
+          break;
+        default:
+          enhancedContent = section.content;
       }
 
       const updatedContent = canvasContent.map((s) =>
